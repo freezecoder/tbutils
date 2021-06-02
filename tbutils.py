@@ -9,7 +9,7 @@
 import os
 import sys
 from tibanna.core import API
-
+import boto3
 from io import StringIO
 from fabric import Connection
 import sys, io
@@ -90,3 +90,53 @@ def tb_get_host_details(jobid=None):
   return(host,stat)
 
 
+""" EC2 client maker """
+def get_ec2_client():
+  client = boto3.client('ec2')
+  #client = boto3.client('ec2',aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)
+  return(client)
+
+def get_ec2_session():
+  #make a boto session
+  session = boto3.session.Session()
+  #session = boto3.session.Session(aws_access_key_id=ACCESS_KEY, aws_secret_access_key=SECRET_KEY)
+  return(session)
+
+
+#Tag instance ID for billing purposes 
+def tag_instance(instanceid=None,jobid=None,fundnumber=000000,client=None,logger=None,description='description',sample="samplex",project="project123",workflow="wf123"):
+  if "PROJECTID" in os.environ:
+        project  = str(os.environ["PROJECTID"])
+  mytags=[{'Key':'Description', 'Value':description},\
+    {'Key':'Project', 'Value':project},\
+    {'Key':'FundNumber', 'Value':str(fundnumber)},\
+    {'Key':'sample', 'Value':sample},\
+    {'Key':'workflow', 'Value':workflow},\
+    {'Key':'jobid', 'Value':jobid}]
+  logger.info("Adding tags")
+  client.create_tags(Resources=[instanceid], Tags=mytags)
+  
+  
+ 
+
+""" EC2 Wait for instance """
+def ec2_wait_for_instance(instanceid):
+    waiter = client.get_waiter('instance_status_ok')
+    print(f"Waiting for {instanceid}")
+    waiter.wait(InstanceIds=[instanceid])
+    print("instance ready")
+    return(1)
+
+""" Obtain the IP address of an instance given it's id"""
+def ec2_instanceip(instanceid):
+    inst=client.describe_instances(InstanceIds=[instanceid])
+    ipadd=inst["Reservations"][0]["Instances"][0]["PublicIpAddress"]
+    return(ipadd)
+
+
+""" KIll the instance """
+def ec2_terminate_instance(instanceid):
+    print("Terminating")
+    response = client.terminate_instances(InstanceIds=[instanceid],DryRun=False)
+    print(response)
+    print("instance terminated")
