@@ -20,9 +20,41 @@ import time
 
 
 
-maxtries=20
+""" Post-run function to copy WDL outputs """
+def tb_postrun(password="",jobid=None,username="ubuntu"):
+  host="-"
+  stat=""
+  maxtries=20
+  print(jobid)
+  host,stat=tb_get_host_details(jobid=jobid)
+  if stat=="terminated":
+          sys.exit()
+  print(f"Have an IP, Host is {host}")
+  done=False
+  failures=0
+  while done is False:
+          try:
+                  print("Making connection")
+                  c = Connection(host,user=username,connect_kwargs={"password": password})
+                  c.put("scripts/sync_outputs.sh","/home/ubuntu/sync_outputs.sh")
+                  c.put("scripts/remote_exec.template.sh","/home/ubuntu/remote_exec.sh")
+                  c.sudo("bash /home/ubuntu/remote_exec.sh  ")
+                  print("Adding crontab")
+                  done=True
+          except:
+                  print("Failure")
+                  print(f"Failed to connect to {host}  and transfer")
+                  time.sleep(30)
+                  failures=failures+1
+                  if failures > maxtries:
+                          print("Reached maximum number of tries, quitting")
+                          break
 
-""" List jkobs """
+
+
+
+
+""" List jobs """
 def tb_list_jobs(n=5):
   #To change TIbanna instance set os. environ
   tb=API()
